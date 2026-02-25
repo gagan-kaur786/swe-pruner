@@ -27,7 +27,7 @@ agent:
     - question should be realistic and developer-oriented, as if asking a code agent
     - question should be specific enough to filter effectively, but concise enough to avoid over-filtering
     - questions should **NOT** contain file-level info (e.g., filenames, line numbers), as the filter model only processes direct command output. For such info, use tools like grep/sed and leave the question blank.
-    - question should be place it immediately after the bash code block (after the closing ```)
+    - question should be placed immediately after the bash code block (after the closing ```)
 
     **Important:** Any output that does not help answer the question will be filtered out. Use this feature judiciously and frame questions as if asking a code agent for specific information.
     **Important:** Reading like `cat` and windowed grep while giving context focus question is a good practice. Try it!
@@ -271,17 +271,9 @@ environment:
   environment_class: docker
 
 model:
-  model_name: Claude 4.5 Sonnet
-  litellm_model_registry: "/data/harry/SWE-Agent-C/mini-swe-agent--with-pruning/src/minisweagent/model_registry.json"
+  model_name: openrouter/z-ai/glm-4.6
   model_kwargs:
-    # custom_llm_provider: "openai"
-    # api_base: http://publicshare.a.pinggy.link/v1
-    api_base: http://claude0openai.a.pinggy.link/v1
-    api_key: msk-00e323944a4933264c7aa966872ae50a0e11298410dbbc4d4b0bd0b1e897ed84 # mine
-    # api_key: msk-67260fae97f724abc513186a3ba35d6e5b61c5bfe262b58e9928c0d69aeb3ccf # coworker's
-    # timeout: 180
     drop_params: true
     temperature: 0.0
-  set_cache_control: default_end
-  # litellm_model_name_override: "claude-sonnet-4-20250514"
-  litellm_model_name_override: claude-sonnet-4-20250514
+    extra_body:
+      allow_fallbacks: false
