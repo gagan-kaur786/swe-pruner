@@ -1,0 +1,326 @@
+diff --git a/django/contrib/auth/validators.py b/django/contrib/auth/validators.py
+index b4878cfd45..1304f20a60 100644
+--- a/django/contrib/auth/validators.py
++++ b/django/contrib/auth/validators.py
+@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
+ 
+ @deconstructible
+ class ASCIIUsernameValidator(validators.RegexValidator):
+-    regex = r'^[\w.@+-]+$'
++    regex = r'\A[\w.@+-]+\Z'
+     message = _(
+         'Enter a valid username. This value may contain only English letters, '
+         'numbers, and @/./+/-/_ characters.'
+@@ -17,7 +17,7 @@ class ASCIIUsernameValidator(validators.RegexValidator):
+ 
+ @deconstructible
+ class UnicodeUsernameValidator(validators.RegexValidator):
+-    regex = r'^[\w.@+-]+$'
++    regex = r'\A[\w.@+-]+\Z'
+     message = _(
+         'Enter a valid username. This value may contain only letters, '
+         'numbers, and @/./+/-/_ characters.'
+diff --git a/test_edge_cases.py b/test_edge_cases.py
+new file mode 100644
+index 0000000000..2dde62e7dc
+--- /dev/null
++++ b/test_edge_cases.py
+@@ -0,0 +1,73 @@
++#!/usr/bin/env python3
++
++import sys
++import os
++sys.path.insert(0, os.path.join(os.path.dirname(__file__), '.'))
++
++# Configure Django settings
++import django
++from django.conf import settings
++
++if not settings.configured:
++    settings.configure(
++        DEBUG=True,
++        USE_I18N=True,
++        SECRET_KEY='test-secret-key',
++        INSTALLED_APPS=[
++            'django.contrib.auth',
++            'django.contrib.contenttypes',
++        ],
++    )
++    django.setup()
++
++from django.contrib.auth.validators import ASCIIUsernameValidator, UnicodeUsernameValidator
++
++def test_edge_cases():
++    """Test edge cases to ensure the fix is robust"""
++    print("Testing edge cases...")
++    
++    ascii_validator = ASCIIUsernameValidator()
++    unicode_validator = UnicodeUsernameValidator()
++    
++    # Edge case tests
++    edge_cases = [
++        ("a", True, "Single character"),
++        ("a\n", False, "Single character with newline"),
++        ("user\r", False, "Username with carriage return"),
++        ("user\r\n", False, "Username with CRLF"),
++        ("user\n\r", False, "Username with LFCR"),
++        ("user\n ", False, "Username with newline and space"),
++        (" user", False, "Username with leading space"),
++        ("user ", False, "Username with trailing space"),
++        ("user\t", False, "Username with tab"),
++        ("user\n\t", False, "Username with newline and tab"),
++        ("123", True, "Numbers only"),
++        ("123\n", False, "Numbers with newline"),
++        ("中文", False, "Chinese characters (ASCII validator)"),
++        ("中文\n", False, "Chinese characters with newline (ASCII validator)"),
++        ("中文", True, "Chinese characters (Unicode validator)"),
++        ("中文\n", False, "Chinese characters with newline (Unicode validator)"),
++    ]
++    
++    print("\nASCIIUsernameValidator edge case results:")
++    for username, expected, description in edge_cases:
++        try:
++            ascii_validator(username)
++            result = True
++        except Exception as e:
++            result = False
++        status = "PASS" if result == expected else "FAIL"
++        print(f"  {description}: '{repr(username)}' -> {result} ({status})")
++    
++    print("\nUnicodeUsernameValidator edge case results:")
++    for username, expected, description in edge_cases:
++        try:
++            unicode_validator(username)
++            result = True
++        except Exception as e:
++            result = False
++        status = "PASS" if result == expected else "FAIL"
++        print(f"  {description}: '{repr(username)}' -> {result} ({status})")
++
++if __name__ == "__main__":
++    test_edge_cases()
+diff --git a/test_simple_edge_cases.py b/test_simple_edge_cases.py
+new file mode 100644
+index 0000000000..c4a3afc897
+--- /dev/null
++++ b/test_simple_edge_cases.py
+@@ -0,0 +1,78 @@
++#!/usr/bin/env python3
++
++import sys
++import os
++sys.path.insert(0, os.path.join(os.path.dirname(__file__), '.'))
++
++# Configure Django settings
++import django
++from django.conf import settings
++
++if not settings.configured:
++    settings.configure(
++        DEBUG=True,
++        USE_I18N=True,
++        SECRET_KEY='test-secret-key',
++        INSTALLED_APPS=[
++            'django.contrib.auth',
++            'django.contrib.contenttypes',
++        ],
++    )
++    django.setup()
++
++from django.contrib.auth.validators import ASCIIUsernameValidator, UnicodeUsernameValidator
++
++def test_simple_edge_cases():
++    """Test simple edge cases to ensure the fix is robust"""
++    print("Testing simple edge cases...")
++    
++    ascii_validator = ASCIIUsernameValidator()
++    unicode_validator = UnicodeUsernameValidator()
++    
++    # Simple edge case tests
++    edge_cases = [
++        ("a", True, "Single character"),
++        ("a\n", False, "Single character with newline"),
++        ("user\r", False, "Username with carriage return"),
++        ("user\r\n", False, "Username with CRLF"),
++        ("user\n\r", False, "Username with LFCR"),
++        ("user\n ", False, "Username with newline and space"),
++        (" user", False, "Username with leading space"),
++        ("user ", False, "Username with trailing space"),
++        ("user\t", False, "Username with tab"),
++        ("user\n\t", False, "Username with newline and tab"),
++        ("123", True, "Numbers only"),
++        ("123\n", False, "Numbers with newline"),
++        ("a" * 150, True, "Long valid username"),
++        ("a" * 150 + "\n", False, "Long username with newline"),
++    ]
++    
++    print("\nASCIIUsernameValidator edge case results:")
++    all_passed = True
++    for username, expected, description in edge_cases:
++        try:
++            ascii_validator(username)
++            result = True
++        except Exception as e:
++            result = False
++        status = "PASS" if result == expected else "FAIL"
++        if status == "FAIL":
++            all_passed = False
++        print(f"  {description}: '{repr(username)}' -> {result} ({status})")
++    
++    print("\nUnicodeUsernameValidator edge case results:")
++    for username, expected, description in edge_cases:
++        try:
++            unicode_validator(username)
++            result = True
++        except Exception as e:
++            result = False
++        status = "PASS" if result == expected else "FAIL"
++        if status == "FAIL":
++            all_passed = False
++        print(f"  {description}: '{repr(username)}' -> {result} ({status})")
++    
++    print(f"\nOverall result: {'ALL TESTS PASSED' if all_passed else 'SOME TESTS FAILED'}")
++
++if __name__ == "__main__":
++    test_simple_edge_cases()
+diff --git a/test_username_validators.py b/test_username_validators.py
+new file mode 100644
+index 0000000000..3b8015940a
+--- /dev/null
++++ b/test_username_validators.py
+@@ -0,0 +1,62 @@
++#!/usr/bin/env python3
++
++import sys
++import os
++sys.path.insert(0, os.path.join(os.path.dirname(__file__), '.'))
++
++# Configure Django settings
++import django
++from django.conf import settings
++
++if not settings.configured:
++    settings.configure(
++        DEBUG=True,
++        USE_I18N=True,
++        SECRET_KEY='test-secret-key',
++        INSTALLED_APPS=[
++            'django.contrib.auth',
++            'django.contrib.contenttypes',
++        ],
++    )
++    django.setup()
++
++from django.contrib.auth.validators import ASCIIUsernameValidator, UnicodeUsernameValidator
++
++def test_current_validators():
++    """Test current validators to show they allow trailing newlines"""
++    print("Testing current validators...")
++    
++    ascii_validator = ASCIIUsernameValidator()
++    unicode_validator = UnicodeUsernameValidator()
++    
++    # Test cases
++    test_cases = [
++        ("validuser", True, "Valid username without newline"),
++        ("validuser\n", True, "Username with trailing newline (should be False)"),
++        ("validuser\n\n", True, "Username with multiple trailing newlines (should be False)"),
++        ("valid user", False, "Username with space (should be False)"),
++        ("", False, "Empty username (should be False)"),
++    ]
++    
++    print("\nASCIIUsernameValidator results:")
++    for username, expected, description in test_cases:
++        try:
++            ascii_validator(username)  # This will raise ValidationError if invalid
++            result = True
++        except Exception as e:
++            result = False
++        status = "PASS" if result == expected else "FAIL"
++        print(f"  {description}: '{repr(username)}' -> {result} ({status})")
++    
++    print("\nUnicodeUsernameValidator results:")
++    for username, expected, description in test_cases:
++        try:
++            unicode_validator(username)  # This will raise ValidationError if invalid
++            result = True
++        except Exception as e:
++            result = False
++        status = "PASS" if result == expected else "FAIL"
++        print(f"  {description}: '{repr(username)}' -> {result} ({status})")
++
++if __name__ == "__main__":
++    test_current_validators()
+diff --git a/test_username_validators_fixed.py b/test_username_validators_fixed.py
+new file mode 100644
+index 0000000000..f20d7a569b
+--- /dev/null
++++ b/test_username_validators_fixed.py
+@@ -0,0 +1,67 @@
++#!/usr/bin/env python3
++
++import sys
++import os
++sys.path.insert(0, os.path.join(os.path.dirname(__file__), '.'))
++
++# Configure Django settings
++import django
++from django.conf import settings
++
++if not settings.configured:
++    settings.configure(
++        DEBUG=True,
++        USE_I18N=True,
++        SECRET_KEY='test-secret-key',
++        INSTALLED_APPS=[
++            'django.contrib.auth',
++            'django.contrib.contenttypes',
++        ],
++    )
++    django.setup()
++
++from django.contrib.auth.validators import ASCIIUsernameValidator, UnicodeUsernameValidator
++
++def test_fixed_validators():
++    """Test fixed validators to ensure they reject trailing newlines"""
++    print("Testing fixed validators...")
++    
++    ascii_validator = ASCIIUsernameValidator()
++    unicode_validator = UnicodeUsernameValidator()
++    
++    # Test cases with corrected expectations
++    test_cases = [
++        ("validuser", True, "Valid username without newline"),
++        ("validuser\n", False, "Username with trailing newline (should be False)"),
++        ("validuser\n\n", False, "Username with multiple trailing newlines (should be False)"),
++        ("valid user", False, "Username with space (should be False)"),
++        ("", False, "Empty username (should be False)"),
++        ("user@domain.com", True, "Username with @ symbol"),
++        ("user.name", True, "Username with . symbol"),
++        ("user+test", True, "Username with + symbol"),
++        ("user-test", True, "Username with - symbol"),
++        ("user_test", True, "Username with _ symbol"),
++    ]
++    
++    print("\nASCIIUsernameValidator results:")
++    for username, expected, description in test_cases:
++        try:
++            ascii_validator(username)  # This will raise ValidationError if invalid
++            result = True
++        except Exception as e:
++            result = False
++        status = "PASS" if result == expected else "FAIL"
++        print(f"  {description}: '{repr(username)}' -> {result} ({status})")
++    
++    print("\nUnicodeUsernameValidator results:")
++    for username, expected, description in test_cases:
++        try:
++            unicode_validator(username)  # This will raise ValidationError if invalid
++            result = True
++        except Exception as e:
++            result = False
++        status = "PASS" if result == expected else "FAIL"
++        print(f"  {description}: '{repr(username)}' -> {result} ({status})")
++
++if __name__ == "__main__":
++    test_fixed_validators()
